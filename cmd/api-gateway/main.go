@@ -21,7 +21,7 @@ func main() {
 
 	r := gin.Default()
 
-	userHandlers := user.NewUserHandlers(nc)
+	userHandlers := user.NewUserHandlers(nc, config.Jwt)
 	router.NewUserRouter(userHandlers).RegisterRoutes(r)
 
 	r.Run(fmt.Sprintf(":%s", config.Http.Port))

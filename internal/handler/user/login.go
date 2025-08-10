@@ -2,7 +2,6 @@ package user
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/eigakan/nats-shared/model"
 	"github.com/eigakan/nats-shared/topics"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginHttpRequestDTO struct {
@@ -17,41 +17,53 @@ type LoginHttpRequestDTO struct {
 	Password string `json:"password" binding:"required,min=5"`
 }
 
+type LoginHttpResponseDTO struct {
+	Token string `json:"token"`
+}
+
+func (h *UserHanlders) makeJwtClaim(login string) jwt.MapClaims {
+	return jwt.MapClaims{
+		"login": login,
+		"exp":   time.Now().Add(time.Hour * time.Duration(h.JwtConf.ExpHours)).Unix(),
+	}
+
+}
+
 func (h *UserHanlders) Login(c *gin.Context) {
 	var reqDto LoginHttpRequestDTO
 	if err := c.ShouldBindJSON(&reqDto); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Error whiel parsuing request"})
 		return
 	}
 
-	np := dto.LoginRequestDTO{
-		Login:    reqDto.Login,
-		Password: reqDto.Password,
-	}
-
-	natsData, err := json.Marshal(np)
+	res, err := h.nc.Request(
+		topics.UserCheckPassword,
+		dto.CheckPasswordRequestDTO{
+			Login:    reqDto.Login,
+			Password: reqDto.Password,
+		},
+		2*time.Second,
+	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Auth error"})
 		return
 	}
 
-	res, err := h.nc.Request(topics.UserLoginTopic, natsData, 2*time.Second)
-	// Timeout or no responders or something
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-
-	var resDto model.NatsResponse[dto.LoginResponseDTO]
+	var resDto model.NatsResponse[dto.CheckPasswordResponseDTO]
 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
-		fmt.Println("Error unmarshalling response:", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error1"})
 		return
 	}
 
-	if resDto.Status {
-		c.JSON(http.StatusOK, resDto)
-	} else {
-		c.JSON(http.StatusBadRequest, resDto)
+	if !resDto.Data.Valid {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error2"})
+		return
 	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, h.makeJwtClaim(reqDto.Login))
+	tokenStr, _ := token.SignedString([]byte(h.JwtConf.Secret))
+
+	c.JSON(http.StatusOK, LoginHttpResponseDTO{
+		Token: tokenStr,
+	})
 }

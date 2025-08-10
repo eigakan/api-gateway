@@ -17,6 +17,10 @@ type RegisterHttpRequestDTO struct {
 	Login    string `json:"login" binding:"required,min=3,max=20"`
 }
 
+type RegisterHttpResponseDTO struct {
+	Ok bool `json:"ok"`
+}
+
 func (h *UserHanlders) Register(c *gin.Context) {
 	var reqDto RegisterHttpRequestDTO
 	if err := c.ShouldBindJSON(&reqDto); err != nil {
@@ -24,34 +28,31 @@ func (h *UserHanlders) Register(c *gin.Context) {
 		return
 	}
 
-	np := dto.RegisterRequestDTO{
-		Login:    reqDto.Login,
-		Password: reqDto.Password,
-		Email:    reqDto.Email,
-	}
-
-	natsData, err := json.Marshal(np)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-		return
-	}
-
-	res, err := h.nc.Request(topics.UserRegisterTopic, natsData, 2*time.Second)
+	res, err := h.nc.Request(
+		topics.UserCreate,
+		dto.CreateUserRequestDTO{
+			Login:    reqDto.Login,
+			Password: reqDto.Password,
+			Email:    reqDto.Email,
+		},
+		2*time.Second,
+	)
 	// Timeout or no responders or something
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	var resDto model.NatsResponse[dto.RegisterResponseDTO]
+	var resDto model.NatsResponse[dto.CreateUserResponseDTO]
 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	if resDto.Status {
-		c.JSON(http.StatusOK, resDto)
-	} else {
-		c.JSON(http.StatusBadRequest, resDto)
+	if !resDto.Data.Ok {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": resDto.Err})
+		return
 	}
+
+	c.JSON(http.StatusOK, RegisterHttpResponseDTO{Ok: true})
 }

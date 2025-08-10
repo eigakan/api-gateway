@@ -17,10 +17,16 @@ type HttpConfig struct {
 	Port string
 }
 
+type JwtConfig struct {
+	Secret   string
+	ExpHours uint
+}
+
 type Config struct {
 	Env  string
 	Nats NatsConfig
 	Http HttpConfig
+	Jwt  JwtConfig
 }
 
 func Load() *Config {
@@ -33,6 +39,11 @@ func Load() *Config {
 		panic("Cannot parse JWT_EXP_HOURS from env. Please set it to a valid integer value")
 	}
 
+	tokenExpHours, err := strconv.Atoi(getEnv("JWT_EXP_HOURS", "24"))
+	if err != nil {
+		panic("Cannot parse JWT_EXP_HOURS from env. Please set it to a valid integer value")
+	}
+
 	return &Config{
 		Env: getEnv("ENV", "dev"),
 		Nats: NatsConfig{
@@ -41,6 +52,10 @@ func Load() *Config {
 		},
 		Http: HttpConfig{
 			Port: getEnv("HTTP_PORT", "8080"),
+		},
+		Jwt: JwtConfig{
+			Secret:   getEnv("JWT_SECRET", "my-super-secret"),
+			ExpHours: uint(tokenExpHours),
 		},
 	}
 }
