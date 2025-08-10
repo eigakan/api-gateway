@@ -1,13 +1,13 @@
 package user
 
 import (
-	"github.com/nats-io/nats.go"
+	nats_client "github.com/eigakan/nats-shared/client"
 )
 
 type UserHanlders struct {
-	nc *nats.Conn
+	nc *nats_client.Client
 }
 
-func NewUserHandlers(nc *nats.Conn) *UserHanlders {
+func NewUserHandlers(nc *nats_client.Client) *UserHanlders {
 	return &UserHanlders{nc: nc}
 }

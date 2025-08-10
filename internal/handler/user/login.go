@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,23 +12,21 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type RegisterHttpRequestDTO struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=5"`
+type LoginHttpRequestDTO struct {
 	Login    string `json:"login" binding:"required,min=3,max=20"`
+	Password string `json:"password" binding:"required,min=5"`
 }
 
-func (h *UserHanlders) Register(c *gin.Context) {
-	var reqDto RegisterHttpRequestDTO
+func (h *UserHanlders) Login(c *gin.Context) {
+	var reqDto LoginHttpRequestDTO
 	if err := c.ShouldBindJSON(&reqDto); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	np := dto.RegisterRequestDTO{
+	np := dto.LoginRequestDTO{
 		Login:    reqDto.Login,
 		Password: reqDto.Password,
-		Email:    reqDto.Email,
 	}
 
 	natsData, err := json.Marshal(np)
@@ -36,15 +35,16 @@ func (h *UserHanlders) Register(c *gin.Context) {
 		return
 	}
 
-	res, err := h.nc.Request(topics.UserRegisterTopic, natsData, 2*time.Second)
+	res, err := h.nc.Request(topics.UserLoginTopic, natsData, 2*time.Second)
 	// Timeout or no responders or something
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
 
-	var resDto model.NatsResponse[dto.RegisterResponseDTO]
+	var resDto model.NatsResponse[dto.LoginResponseDTO]
 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
+		fmt.Println("Error unmarshalling response:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
 		return
 	}
