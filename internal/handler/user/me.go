@@ -1,59 +1,63 @@
 package user
 
-// import (
-// 	"encoding/json"
-// 	"net/http"
-// 	"time"
+import (
+	"encoding/json"
+	"errors"
+	"net/http"
+	"strconv"
+	"time"
 
-// 	dto "github.com/eigakan/nats-shared/dto/user"
-// 	"github.com/eigakan/nats-shared/model"
-// 	"github.com/eigakan/nats-shared/topics"
-// 	"github.com/gin-gonic/gin"
-// 	"github.com/golang-jwt/jwt/v5"
-// )
+	dto "github.com/eigakan/nats-shared/dto/user"
+	"github.com/eigakan/nats-shared/model"
+	nats_model "github.com/eigakan/nats-shared/model"
+	"github.com/eigakan/nats-shared/topics"
+	"github.com/gin-gonic/gin"
+)
 
-// type MeHttpRequestDTO struct {
-// 	Login    string `json:"login" binding:"required,min=3,max=20"`
-// 	Password string `json:"password" binding:"required,min=5"`
-// }
+type MeHttpRequestDTO struct {
+	Login    string `json:"login" binding:"required,min=3,max=20"`
+	Password string `json:"password" binding:"required,min=5"`
+}
 
-// type MeHttpResponseDTO struct {
-// 	Token string `json:"token"`
-// }
+type MeHttpResponseDTO struct {
+	nats_model.User
+}
 
-// func (h *UserHanlders) Login(c *gin.Context) {
-// 	var reqDto LoginHttpRequestDTO
-// 	if err := c.ShouldBindJSON(&reqDto); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Error whiel parsuing request"})
-// 		return
-// 	}
+func (h *UserHanlders) Me(c *gin.Context) {
+	var reqDto LoginHttpRequestDTO
+	if err := c.ShouldBindJSON(&reqDto); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
+		return
+	}
 
-// 	np := dto.CheckPasswordRequestDTO{
-// 		Login:    reqDto.Login,
-// 		Password: reqDto.Password,
-// 	}
+	userIdstr := c.GetString("userId")
+	if userIdstr == "" {
+		c.AbortWithError(http.StatusUnauthorized, errors.New("Unauthorized"))
+		return
+	}
 
-// 	res, err := h.nc.Request(topics.UserCheckPassword, np, 2*time.Second)
-// 	if err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Auth error"})
-// 		return
-// 	}
+	userId, err := strconv.Atoi(userIdstr)
+	if err != nil {
+		c.AbortWithError(http.StatusUnauthorized, errors.New("Unauthorized"))
+		return
+	}
 
-// 	var resDto model.NatsResponse[dto.CheckPasswordResponseDTO]
-// 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-// 		return
-// 	}
+	res, err := h.nc.Request(topics.UserGet, dto.GetUserRequestDTO{UserID: uint(userId)}, 2*time.Second)
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
+		return
+	}
 
-// 	if !resDto.Data.Valid {
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
-// 		return
-// 	}
+	var resDto model.NatsResponse[dto.GetUserResponseDTO]
+	if err := json.Unmarshal(res.Data, &resDto); err != nil {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
+		return
+	}
 
-// 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, h.makeJwtClaim(reqDto.Login))
-// 	tokenStr, _ := token.SignedString(h.jwtConf.Secret)
+	if !resDto.Status {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
+		return
+	}
 
-// 	c.JSON(http.StatusOK, LoginHttpResponseDTO{
-// 		Token: tokenStr,
-// 	})
-// }
+	c.JSON(http.StatusOK, MeHttpResponseDTO{User: resDto.Data.User})
+}

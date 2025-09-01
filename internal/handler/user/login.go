@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -9,7 +10,6 @@ import (
 	"github.com/eigakan/nats-shared/model"
 	"github.com/eigakan/nats-shared/topics"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type LoginHttpRequestDTO struct {
@@ -21,49 +21,44 @@ type LoginHttpResponseDTO struct {
 	Token string `json:"token"`
 }
 
-func (h *UserHanlders) makeJwtClaim(login string) jwt.MapClaims {
-	return jwt.MapClaims{
-		"login": login,
-		"exp":   time.Now().Add(time.Hour * time.Duration(h.JwtConf.ExpHours)).Unix(),
-	}
-
-}
-
 func (h *UserHanlders) Login(c *gin.Context) {
 	var reqDto LoginHttpRequestDTO
 	if err := c.ShouldBindJSON(&reqDto); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Error whiel parsuing request"})
+		c.AbortWithError(http.StatusBadRequest, errors.New("Login or password not valid"))
 		return
 	}
 
 	res, err := h.nc.Request(
-		topics.UserCheckPassword,
-		dto.CheckPasswordRequestDTO{
+		topics.UserGetByPassword,
+		dto.GetUserByPasswordRequestDTO{
 			Login:    reqDto.Login,
 			Password: reqDto.Password,
 		},
 		2*time.Second,
 	)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Auth error"})
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 
-	var resDto model.NatsResponse[dto.CheckPasswordResponseDTO]
+	var resDto model.NatsResponse[dto.GetUserByPasswordResponseDTO]
 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error1"})
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 
-	if !resDto.Data.Valid {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error2"})
+	if !resDto.Status {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, h.makeJwtClaim(reqDto.Login))
-	tokenStr, _ := token.SignedString([]byte(h.JwtConf.Secret))
+	token, err := h.Jwt.Generate(resDto.Data.ID)
+
+	if err != nil {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
+	}
 
 	c.JSON(http.StatusOK, LoginHttpResponseDTO{
-		Token: tokenStr,
+		Token: token,
 	})
 }

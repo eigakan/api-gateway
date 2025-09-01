@@ -2,14 +2,14 @@ module github.com/eigakan/api-gateway
 
 go 1.24.6
 
-// replace github.com/eigakan/nats-shared => ../nats-shared
-
 require (
-	github.com/eigakan/nats-shared v0.0.0-20250810153617-f3f5680a61e4
+	github.com/eigakan/nats-shared v0.0.0-20250831232047-75c712b11892
 	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
 	github.com/nats-io/nats.go v1.44.0
 )
+
+replace github.com/eigakan/nats-shared => ../nats-shared
 
 require (
 	github.com/bytedance/sonic v1.14.0 // indirect

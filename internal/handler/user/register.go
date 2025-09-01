@@ -2,6 +2,7 @@ package user
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -39,18 +40,18 @@ func (h *UserHanlders) Register(c *gin.Context) {
 	)
 	// Timeout or no responders or something
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 
 	var resDto model.NatsResponse[dto.CreateUserResponseDTO]
 	if err := json.Unmarshal(res.Data, &resDto); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal server error"})
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 
-	if !resDto.Data.Ok {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": resDto.Err})
+	if !resDto.Status {
+		c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 		return
 	}
 

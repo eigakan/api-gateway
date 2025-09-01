@@ -5,6 +5,7 @@ import (
 
 	"github.com/eigakan/api-gateway/config"
 	"github.com/eigakan/api-gateway/internal/handler/user"
+	"github.com/eigakan/api-gateway/internal/pkg"
 	"github.com/eigakan/api-gateway/internal/router"
 	nats_client "github.com/eigakan/nats-shared/client"
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,7 @@ func main() {
 
 	r := gin.Default()
 
-	userHandlers := user.NewUserHandlers(nc, config.Jwt)
+	userHandlers := user.NewUserHandlers(nc, pkg.NewJwt(&config.Jwt))
 	router.NewUserRouter(userHandlers).RegisterRoutes(r)
 
 	r.Run(fmt.Sprintf(":%s", config.Http.Port))

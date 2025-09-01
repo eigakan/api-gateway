@@ -2,20 +2,20 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  cmd = "go build -o ./tmp/main ./cmd/api-gateway"
-  bin = "tmp/main"
-  include_ext = ["go"]
-  exclude_dir = ["tmp", "vendor"]
-  delay = 500
+cmd = "go build -o ./tmp/main ./cmd/api-gateway"
+bin = "tmp/main"
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor"]
+delay = 500
 
 [log]
-  time = true
-  time_format = "2006-01-02 15:04:05"
+time = true
+time_format = "2006-01-02 15:04:05"
 
 [watch]
-  # Watch all Go files in the project
-  include_ext = ["go"]
-  exclude_dir = ["tmp", "vendor"]
+# Watch all Go files in the project
+include_ext = ["go"]
+exclude_dir = ["tmp", "vendor"]
 
 [run]
-  cmd = "./tmp/main"
+cmd = "./tmp/main"

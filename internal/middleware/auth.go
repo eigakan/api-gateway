@@ -2,27 +2,19 @@ package middleware
 
 import (
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"strings"
 
-	"github.com/eigakan/api-gateway/config"
+	"github.com/eigakan/api-gateway/internal/pkg"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
-type myClaims struct {
-	Login string `json:"login"`
-	jwt.RegisteredClaims
-}
-
 type AuthMiddleware struct {
-	jwtConf config.JwtConfig
+	jwt *pkg.Jwt
 }
 
-func NewAuthMiddleware(jwtConf config.JwtConfig) *AuthMiddleware {
-	return &AuthMiddleware{jwtConf: jwtConf}
+func NewAuthMiddleware(jwt *pkg.Jwt) *AuthMiddleware {
+	return &AuthMiddleware{jwt: jwt}
 }
 
 func (m *AuthMiddleware) extractBearerToken(header string) (string, error) {
@@ -38,47 +30,22 @@ func (m *AuthMiddleware) extractBearerToken(header string) (string, error) {
 	return jwtToken[1], nil
 }
 
-func (m *AuthMiddleware) isTokenValid(jwtToken string) string {
-	token, err := jwt.ParseWithClaims(jwtToken, &myClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		}
-		return []byte(m.jwtConf.Secret), nil
-	})
-
-	if err != nil {
-		log.Println("Parse error:", err)
-		return ""
-	}
-
-	claims, ok := token.Claims.(*myClaims)
-
-	if !ok {
-		return ""
-	}
-
-	if token.Valid {
-		return claims.Login
-	}
-
-	return ""
-}
-
 func (m *AuthMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		jwtToken, err := m.extractBearerToken(c.GetHeader("Authorization"))
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.AbortWithError(http.StatusInternalServerError, errors.New(""))
 			return
 		}
 
-		login := m.isTokenValid(jwtToken)
+		userId, ok := m.jwt.Verify(jwtToken)
 
-		if login == "" {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid JWT token"})
+		if !ok {
+			c.AbortWithError(http.StatusUnauthorized, errors.New("Invalid JWT token"))
+			return
 		}
 
-		c.Set("login", login)
+		c.Set("userId", userId)
 		c.Next()
 	}
 }

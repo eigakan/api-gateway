@@ -15,16 +15,15 @@ func NewUserRouter(uh *user.UserHanlders) *UserRouter {
 }
 
 func (ur *UserRouter) RegisterRoutes(r *gin.Engine) *gin.Engine {
+	ag := r.Group("/auth")
+	ag.Use(middleware.NewResponseMiddleware().Handler())
 	// Protected routes
-	pr := r.Group("/")
-	pr.Use(middleware.NewAuthMiddleware(ur.uh.JwtConf).Handler())
+	prg := ag.Group("/")
+	prg.Use(middleware.NewAuthMiddleware(ur.uh.Jwt).Handler())
 
-	pr.GET("/test", func(c *gin.Context) {
-		c.JSON(200, gin.H{"message": "Protected user route"})
-	})
+	prg.GET("/me", ur.uh.Me)
 
 	// Auth routes
-	ag := r.Group("/auth")
 	ag.POST("/register", ur.uh.Register)
 	ag.POST("/login", ur.uh.Login)
 
